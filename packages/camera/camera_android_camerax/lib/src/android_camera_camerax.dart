@@ -960,7 +960,7 @@ class AndroidCameraCameraX extends CameraPlatform {
 
     // Set target rotation to default CameraX rotation only if capture
     // orientation not locked.
-    if (!captureOrientationLocked && shouldSetDefaultRotation) {
+    if (!(captureOrientationLocked && shouldSetDefaultRotation)) {
       await imageCapture!.setTargetRotation(
         await deviceOrientationManager.getDefaultDisplayRotation(),
       );
