@@ -55,7 +55,7 @@ class FakeController extends ValueNotifier<CameraValue>
   ImageFormatGroup? get imageFormatGroup => null;
 
   @override
-  Future<void> initialize() async {}
+  Future<void> initialize({DeviceOrientation? initialOrientation}) async {}
 
   @override
   Future<void> lockCaptureOrientation([DeviceOrientation? orientation]) async {}
