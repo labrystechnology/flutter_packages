@@ -313,12 +313,17 @@ class CameraController extends ValueNotifier<CameraValue> {
   /// Initializes the camera on the device.
   ///
   /// Throws a [CameraException] if the initialization fails.
-  Future<void> initialize() => _initializeWithDescription(description);
+  Future<void> initialize({DeviceOrientation? initialOrientation}) =>
+      _initializeWithDescription(description,
+          initialOrientation: initialOrientation);
 
   /// Initializes the camera on the device with the specified description.
   ///
   /// Throws a [CameraException] if the initialization fails.
-  Future<void> _initializeWithDescription(CameraDescription description) async {
+  Future<void> _initializeWithDescription(
+    CameraDescription description, {
+    DeviceOrientation? initialOrientation,
+  }) async {
     if (_isDisposed) {
       throw CameraException(
         'Disposed CameraController',
@@ -336,9 +341,9 @@ class CameraController extends ValueNotifier<CameraValue> {
       _deviceOrientationSubscription ??= CameraPlatform.instance
           .onDeviceOrientationChanged()
           .listen((DeviceOrientationChangedEvent event) {
-        value = value.copyWith(
-          deviceOrientation: event.orientation,
-        );
+        if (value.isInitialized) {
+          value = value.copyWith(deviceOrientation: event.orientation);
+        }
       });
 
       _cameraId = await CameraPlatform.instance.createCameraWithSettings(
@@ -374,6 +379,7 @@ class CameraController extends ValueNotifier<CameraValue> {
             (CameraInitializedEvent event) => event.exposurePointSupported),
         focusPointSupported: await initializeCompleter.future
             .then((CameraInitializedEvent event) => event.focusPointSupported),
+        deviceOrientation: initialOrientation ?? value.deviceOrientation,
       );
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
