@@ -331,6 +331,10 @@ class CameraController extends ValueNotifier<CameraValue> {
       );
     }
 
+    value = value.copyWith(
+      deviceOrientation: initialOrientation ?? value.deviceOrientation,
+    );
+
     final Completer<void> initializeCompleter = Completer<void>();
     _initializeFuture = initializeCompleter.future;
 
