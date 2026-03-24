@@ -158,6 +158,15 @@ final class DefaultCamera: NSObject, Camera {
       connection.isVideoMirrored = true
     }
 
+    // Lock the preview connection to portrait orientation so that pixel buffers
+    // are always delivered in portrait. This avoids the need for Flutter-side
+    // rotation (e.g. RotatedBox) when the app UI is locked to portrait.
+    // Photo/video capture orientation is handled separately via
+    // lockCaptureOrientation/updateOrientation on the photo output connection.
+    if connection.isVideoOrientationSupported {
+      connection.videoOrientation = .portrait
+    }
+
     return (captureVideoInput, captureVideoOutput, connection)
   }
 
@@ -807,7 +816,14 @@ final class DefaultCamera: NSObject, Camera {
       : deviceOrientation
 
     updateOrientation(orientation, forCaptureOutput: capturePhotoOutput)
-    updateOrientation(orientation, forCaptureOutput: captureVideoOutput)
+
+    // Only update the video output (preview) connection orientation when
+    // capture orientation is explicitly locked (i.e. before photo/video
+    // capture). Otherwise, keep the preview connection in portrait so that
+    // apps with a locked-to-portrait UI don't need Flutter-side rotation.
+    if lockedCaptureOrientation != .unknown {
+      updateOrientation(orientation, forCaptureOutput: captureVideoOutput)
+    }
   }
 
   private func updateOrientation(
@@ -848,6 +864,13 @@ final class DefaultCamera: NSObject, Camera {
   func unlockCaptureOrientation() {
     lockedCaptureOrientation = .unknown
     updateOrientation()
+
+    // Reset the preview connection back to portrait after unlocking.
+    if let connection = captureVideoOutput.connection(with: .video),
+      connection.isVideoOrientationSupported
+    {
+      connection.videoOrientation = .portrait
+    }
   }
 
   func setImageFileFormat(_ fileFormat: PlatformImageFileFormat) {
