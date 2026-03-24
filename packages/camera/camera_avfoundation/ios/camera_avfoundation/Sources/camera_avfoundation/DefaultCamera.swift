@@ -158,12 +158,14 @@ final class DefaultCamera: NSObject, Camera {
       connection.isVideoMirrored = true
     }
 
-    // Lock the preview connection to portrait orientation so that pixel buffers
-    // are always delivered in portrait. This avoids the need for Flutter-side
-    // rotation (e.g. RotatedBox) when the app UI is locked to portrait.
-    // Photo/video capture orientation is handled separately via
-    // lockCaptureOrientation/updateOrientation on the photo output connection.
-    if connection.isVideoOrientationSupported {
+    // On iPhones the app UI is typically locked to portrait. Lock the preview
+    // connection to portrait so that pixel buffers are always delivered in the
+    // correct orientation without needing Flutter-side rotation (RotatedBox).
+    // On iPads the app supports all orientations, so the preview connection
+    // must update dynamically (handled by updateOrientation).
+    if UIDevice.current.userInterfaceIdiom == .phone,
+      connection.isVideoOrientationSupported
+    {
       connection.videoOrientation = .portrait
     }
 
@@ -815,11 +817,14 @@ final class DefaultCamera: NSObject, Camera {
       ? lockedCaptureOrientation
       : deviceOrientation
 
-    // Only update the photo output connection orientation. The video output
-    // (preview) connection is locked to portrait in createConnection() and
-    // must never be changed, so that apps with a portrait-locked UI always
-    // receive correctly oriented preview frames.
     updateOrientation(orientation, forCaptureOutput: capturePhotoOutput)
+
+    // On iPads the app supports all orientations, so the preview (video output)
+    // connection must rotate with the device. On iPhones the preview connection
+    // is locked to portrait in createConnection() and must not be changed.
+    if UIDevice.current.userInterfaceIdiom != .phone {
+      updateOrientation(orientation, forCaptureOutput: captureVideoOutput)
+    }
   }
 
   private func updateOrientation(
