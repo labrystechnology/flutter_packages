@@ -56,6 +56,11 @@ final class DefaultCamera: NSObject, Camera {
   private let videoDimensionsConverter: VideoDimensionsConverter
 
   private let deviceOrientationProvider: DeviceOrientationProvider
+
+  /// The interface idiom (phone, pad, etc.), resolved once at init on the main
+  /// thread and cached to avoid reading UIDevice off the capture session queue.
+  private let userInterfaceIdiom: UIUserInterfaceIdiom
+
   private let motionManager = CMMotionManager()
 
   private(set) var captureDevice: CaptureDevice
@@ -137,7 +142,8 @@ final class DefaultCamera: NSObject, Camera {
   private static func createConnection(
     captureDevice: CaptureDevice,
     videoFormat: FourCharCode,
-    captureDeviceInputFactory: CaptureDeviceInputFactory
+    captureDeviceInputFactory: CaptureDeviceInputFactory,
+    userInterfaceIdiom: UIUserInterfaceIdiom
   ) throws -> (CaptureInput, CaptureVideoDataOutput, AVCaptureConnection) {
     // Setup video capture input.
     let captureVideoInput = try captureDeviceInputFactory.deviceInput(with: captureDevice)
@@ -163,7 +169,7 @@ final class DefaultCamera: NSObject, Camera {
     // correct orientation without needing Flutter-side rotation (RotatedBox).
     // On iPads the app supports all orientations, so the preview connection
     // must update dynamically (handled by updateOrientation).
-    if UIDevice.current.userInterfaceIdiom == .phone,
+    if userInterfaceIdiom == .phone,
       connection.isVideoOrientationSupported
     {
       connection.videoOrientation = .portrait
@@ -185,6 +191,7 @@ final class DefaultCamera: NSObject, Camera {
     inputPixelBufferAdaptorFactory = configuration.inputPixelBufferAdaptorFactory
     videoDimensionsConverter = configuration.videoDimensionsConverter
     deviceOrientationProvider = configuration.deviceOrientationProvider
+    userInterfaceIdiom = configuration.deviceTypeProvider.userInterfaceIdiom
 
     captureDevice = videoCaptureDeviceFactory(configuration.initialCameraName)
     flashMode = captureDevice.hasFlash ? .auto : .off
@@ -201,7 +208,8 @@ final class DefaultCamera: NSObject, Camera {
     (captureVideoInput, captureVideoOutput, connection) = try DefaultCamera.createConnection(
       captureDevice: captureDevice,
       videoFormat: videoFormat,
-      captureDeviceInputFactory: configuration.captureDeviceInputFactory)
+      captureDeviceInputFactory: configuration.captureDeviceInputFactory,
+      userInterfaceIdiom: configuration.deviceTypeProvider.userInterfaceIdiom)
 
     super.init()
 
@@ -822,7 +830,7 @@ final class DefaultCamera: NSObject, Camera {
     // On iPads the app supports all orientations, so the preview (video output)
     // connection must rotate with the device. On iPhones the preview connection
     // is locked to portrait in createConnection() and must not be changed.
-    if UIDevice.current.userInterfaceIdiom != .phone {
+    if userInterfaceIdiom != .phone {
       updateOrientation(orientation, forCaptureOutput: captureVideoOutput)
     }
   }
@@ -1175,7 +1183,8 @@ final class DefaultCamera: NSObject, Camera {
       (captureVideoInput, captureVideoOutput, newConnection) = try DefaultCamera.createConnection(
         captureDevice: captureDevice,
         videoFormat: videoFormat,
-        captureDeviceInputFactory: captureDeviceInputFactory)
+        captureDeviceInputFactory: captureDeviceInputFactory,
+        userInterfaceIdiom: userInterfaceIdiom)
 
       captureVideoOutput.setSampleBufferDelegate(self, queue: captureSessionQueue)
     } catch {
