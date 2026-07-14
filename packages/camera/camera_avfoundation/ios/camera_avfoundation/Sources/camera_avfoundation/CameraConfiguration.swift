@@ -35,6 +35,7 @@ class CameraConfiguration {
   var inputPixelBufferAdaptorFactory: InputPixelBufferAdaptorFactory
   var videoDimensionsConverter: VideoDimensionsConverter
   var deviceOrientationProvider: DeviceOrientationProvider
+  var deviceTypeProvider: DeviceTypeProvider
   let initialCameraName: String
   var orientation: UIDeviceOrientation
 
@@ -59,6 +60,7 @@ class CameraConfiguration {
     self.initialCameraName = initialCameraName
     self.orientation = UIDevice.current.orientation
     self.deviceOrientationProvider = DefaultDeviceOrientationProvider()
+    self.deviceTypeProvider = DefaultDeviceTypeProvider()
 
     self.videoDimensionsConverter = { format in
       return CMVideoFormatDescriptionGetDimensions(format.formatDescription)

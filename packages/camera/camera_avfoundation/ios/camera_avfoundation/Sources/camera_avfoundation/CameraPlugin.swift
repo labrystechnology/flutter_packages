@@ -18,6 +18,11 @@ public final class CameraPlugin: NSObject, FlutterPlugin {
   /// All FLTCam's state access and capture session related operations should be on run on this queue.
   private let captureSessionQueue: DispatchQueue
 
+  /// Provides the interface idiom (phone, pad, etc.). Resolved on the main
+  /// thread here so cameras created on the capture session queue don't read
+  /// UIDevice off the main thread.
+  private let deviceTypeProvider: DeviceTypeProvider
+
   /// An internal camera object that manages camera's state and performs camera operations.
   var camera: Camera?
 
@@ -61,6 +66,7 @@ public final class CameraPlugin: NSObject, FlutterPlugin {
     self.captureSessionFactory = captureSessionFactory
     self.captureDeviceInputFactory = captureDeviceInputFactory
     self.captureSessionQueue = captureSessionQueue
+    self.deviceTypeProvider = DefaultDeviceTypeProvider()
 
     super.init()
 
@@ -255,6 +261,7 @@ extension CameraPlugin: CameraApi {
       captureDeviceInputFactory: captureDeviceInputFactory,
       initialCameraName: name
     )
+    camConfiguration.deviceTypeProvider = deviceTypeProvider
 
     do {
       let newCamera = try DefaultCamera(configuration: camConfiguration)
