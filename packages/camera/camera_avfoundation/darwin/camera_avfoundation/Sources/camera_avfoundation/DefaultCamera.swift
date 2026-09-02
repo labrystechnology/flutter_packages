@@ -640,6 +640,7 @@ final class DefaultCamera: NSObject, Camera {
     videoAdaptor = inputPixelBufferAdaptorFactory(videoWriterInput, sourcePixelBufferAttributes)
 
     videoWriterInput.expectsMediaDataInRealTime = true
+    videoWriterInput.transform = videoRecordingTransform()
 
     // Add the audio input
     if mediaSettings.enableAudio {
@@ -859,6 +860,35 @@ final class DefaultCamera: NSObject, Camera {
       return .portraitUpsideDown
     default:
       return .portrait
+    }
+  }
+
+  /// Returns the display transform for the recorded video track.
+  ///
+  /// On iPhones the video output connection is locked to portrait in
+  /// createConnection(), so sample buffers are always delivered
+  /// portrait-oriented regardless of how the device is held. The capture
+  /// orientation is therefore encoded into the track's display matrix so that
+  /// landscape recordings play back upright. On other devices the connection
+  /// orientation is kept up to date by updateOrientation(), so the buffers are
+  /// already physically rotated and no transform is needed.
+  private func videoRecordingTransform() -> CGAffineTransform {
+    guard userInterfaceIdiom == .phone else { return .identity }
+
+    let orientation =
+      (lockedCaptureOrientation != .unknown)
+      ? lockedCaptureOrientation
+      : deviceOrientation
+
+    switch orientation {
+    case .landscapeRight:
+      return CGAffineTransform(rotationAngle: .pi / 2)
+    case .landscapeLeft:
+      return CGAffineTransform(rotationAngle: -.pi / 2)
+    case .portraitUpsideDown:
+      return CGAffineTransform(rotationAngle: .pi)
+    default:
+      return .identity
     }
   }
 

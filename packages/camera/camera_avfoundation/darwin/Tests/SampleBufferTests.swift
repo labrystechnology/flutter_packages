@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import AVFoundation
+import UIKit
 import XCTest
 
 @testable import camera_avfoundation
@@ -63,7 +64,7 @@ private class FakeMediaSettingsAVWrapper: FLTCamMediaSettingsAVWrapper {
 
 /// Includes test cases related to sample buffer handling for Camera class.
 final class CameraSampleBufferTests: XCTestCase {
-  private func createCamera() -> (
+  private func createCamera(userInterfaceIdiom: UIUserInterfaceIdiom = .phone) -> (
     DefaultCamera,
     MockAssetWriter,
     MockAssetWriterInputPixelBufferAdaptor,
@@ -74,6 +75,8 @@ final class CameraSampleBufferTests: XCTestCase {
     let input = MockAssetWriterInput()
 
     let configuration = CameraTestUtils.createTestCameraConfiguration()
+    configuration.deviceTypeProvider = DefaultDeviceTypeProvider(
+      userInterfaceIdiom: userInterfaceIdiom)
     configuration.mediaSettings = PlatformMediaSettings(
       resolutionPreset: .medium,
       framesPerSecond: nil,
@@ -120,6 +123,38 @@ final class CameraSampleBufferTests: XCTestCase {
     XCTAssertEqual(
       deliveredPixelBuffer, capturedPixelBuffer,
       "Camera must deliver the latest captured pixel buffer to copyPixelBuffer API.")
+  }
+
+  func testStartVideoRecording_onPhone_setsVideoWriterTransformForDeviceOrientation() {
+    let (camera, _, _, input) = createCamera()
+    camera.deviceOrientation = .landscapeLeft
+
+    camera.startVideoRecording(completion: { error in }, messengerForStreaming: nil)
+
+    XCTAssertEqual(
+      input.transform, CGAffineTransform(rotationAngle: -.pi / 2),
+      "On iPhones the capture orientation must be encoded into the video track transform "
+        + "because sample buffers are locked to portrait.")
+  }
+
+  func testStartVideoRecording_onPhone_setsVideoWriterTransformForLockedOrientation() {
+    let (camera, _, _, input) = createCamera()
+    camera.lockCaptureOrientation(.landscapeRight)
+
+    camera.startVideoRecording(completion: { error in }, messengerForStreaming: nil)
+
+    XCTAssertEqual(input.transform, CGAffineTransform(rotationAngle: .pi / 2))
+  }
+
+  func testStartVideoRecording_onPad_setsIdentityVideoWriterTransform() {
+    let (camera, _, _, input) = createCamera(userInterfaceIdiom: .pad)
+    camera.deviceOrientation = .landscapeLeft
+
+    camera.startVideoRecording(completion: { error in }, messengerForStreaming: nil)
+
+    XCTAssertEqual(
+      input.transform, .identity,
+      "On iPads the video output connection rotates physically, so no transform is needed.")
   }
 
   func testDidOutputSampleBuffer_mustNotChangeSampleBufferRetainCountAfterPauseResumeRecording() {

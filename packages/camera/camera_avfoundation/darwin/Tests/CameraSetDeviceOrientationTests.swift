@@ -3,13 +3,19 @@
 // found in the LICENSE file.
 
 import AVFoundation
+import UIKit
 import XCTest
 
 @testable import camera_avfoundation
 
 final class CameraSetDeviceOrientationTests: XCTestCase {
-  private func createCamera() -> (Camera, MockCaptureConnection, MockCaptureConnection) {
-    let camera = CameraTestUtils.createTestCamera()
+  private func createCamera(
+    userInterfaceIdiom: UIUserInterfaceIdiom
+  ) -> (Camera, MockCaptureConnection, MockCaptureConnection) {
+    let configuration = CameraTestUtils.createTestCameraConfiguration()
+    configuration.deviceTypeProvider = DefaultDeviceTypeProvider(
+      userInterfaceIdiom: userInterfaceIdiom)
+    let camera = CameraTestUtils.createTestCamera(configuration)
 
     let mockCapturePhotoOutput = MockCapturePhotoOutput()
     let mockPhotoCaptureConnection = MockCaptureConnection()
@@ -29,7 +35,8 @@ final class CameraSetDeviceOrientationTests: XCTestCase {
   }
 
   func testSetDeviceOrientation_setsOrientationsOfCaptureConnections() {
-    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera()
+    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera(
+      userInterfaceIdiom: .pad)
     var photoSetVideoOrientationCalled = false
     mockPhotoCaptureConnection.setVideoOrientationStub = { orientation in
       // Device orientation is flipped compared to video orientation. When UIDeviceOrientation
@@ -52,10 +59,29 @@ final class CameraSetDeviceOrientationTests: XCTestCase {
     XCTAssertTrue(videoSetVideoOrientationCalled)
   }
 
+  func testSetDeviceOrientation_onPhone_doesNotSetVideoCaptureConnectionOrientation() {
+    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera(
+      userInterfaceIdiom: .phone)
+    var photoSetVideoOrientationCalled = false
+    mockPhotoCaptureConnection.setVideoOrientationStub = { orientation in
+      XCTAssertEqual(orientation, .landscapeRight)
+      photoSetVideoOrientationCalled = true
+    }
+
+    // On iPhones the video output (preview) connection is locked to portrait
+    // in createConnection() and must not be updated on device rotation.
+    mockVideoCaptureConnection.setVideoOrientationStub = { _ in XCTFail() }
+
+    camera.deviceOrientation = .landscapeLeft
+
+    XCTAssertTrue(photoSetVideoOrientationCalled)
+  }
+
   func
     testSetDeviceOrientation_setsLockedOrientationsOfCaptureConnection_ifCaptureOrientationIsLocked()
   {
-    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera()
+    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera(
+      userInterfaceIdiom: .pad)
     var photoSetVideoOrientationCalled = false
     mockPhotoCaptureConnection.setVideoOrientationStub = { orientation in
       XCTAssertEqual(orientation, .portraitUpsideDown)
@@ -77,7 +103,8 @@ final class CameraSetDeviceOrientationTests: XCTestCase {
   }
 
   func testSetDeviceOrientation_doesNotSetOrientations_ifRecordingIsInProgress() {
-    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera()
+    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera(
+      userInterfaceIdiom: .pad)
 
     camera.startVideoRecording(completion: { _ in }, messengerForStreaming: nil)
 
@@ -88,7 +115,8 @@ final class CameraSetDeviceOrientationTests: XCTestCase {
   }
 
   func testSetDeviceOrientation_doesNotSetOrientations_forDuplicateUpdates() {
-    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera()
+    let (camera, mockPhotoCaptureConnection, mockVideoCaptureConnection) = createCamera(
+      userInterfaceIdiom: .pad)
     var photoSetVideoOrientationCallCount = 0
     mockPhotoCaptureConnection.setVideoOrientationStub = { _ in
       photoSetVideoOrientationCallCount += 1
