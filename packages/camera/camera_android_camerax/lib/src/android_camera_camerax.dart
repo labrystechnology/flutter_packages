@@ -1088,12 +1088,15 @@ class AndroidCameraCameraX extends CameraPlatform {
   ///
   /// CameraX only supports setting JPEG quality via `ImageCapture.Builder`
   /// at construction time, so this recreates the `ImageCapture` use case
-  /// with the requested quality. The next call to [takePicture] will bind
-  /// the new instance automatically.
+  /// with the requested quality. If the previous instance was bound, the new
+  /// instance is rebound immediately; otherwise the next call to
+  /// [takePicture] will bind it automatically.
   @override
   Future<void> setJpegImageQuality(int cameraId, int quality) async {
     // Unbind the current ImageCapture if it exists and is bound.
+    var imageCaptureWasBound = false;
     if (imageCapture != null) {
+      imageCaptureWasBound = await processCameraProvider!.isBound(imageCapture!);
       await _unbindUseCaseFromLifecycle(imageCapture!);
     }
 
@@ -1106,6 +1109,15 @@ class AndroidCameraCameraX extends CameraPlatform {
       targetRotation: targetRotation,
       jpegQuality: quality,
     );
+
+    // Rebind immediately if the previous instance was bound so the camera
+    // session keeps the same use case combination. Leaving ImageCapture
+    // unbound until the next takePicture call can change the resolved stream
+    // configuration and visibly alter the preview field of view on some
+    // devices.
+    if (imageCaptureWasBound) {
+      await _bindUseCaseToLifecycle(imageCapture!, cameraId);
+    }
   }
 
   /// Prepare the capture session for video recording.
