@@ -6,6 +6,7 @@ package io.flutter.plugins.videoplayer;
 
 import static androidx.media3.common.Player.REPEAT_MODE_ALL;
 import static androidx.media3.common.Player.REPEAT_MODE_OFF;
+import static androidx.media3.common.Player.STATE_ENDED;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -166,6 +167,17 @@ public abstract class VideoPlayer implements VideoPlayerInstanceApi {
 
   @Override
   public void seekTo(long position) {
+    // Work around prolonged buffering when seeking after completion on some
+    // Android devices: https://github.com/flutter/flutter/issues/170737.
+    if (exoPlayer.getPlaybackState() == STATE_ENDED) {
+      exoPlayer.stop();
+      if (position == 0) {
+        exoPlayer.seekToDefaultPosition();
+        exoPlayer.prepare();
+        return;
+      }
+      exoPlayer.prepare();
+    }
     exoPlayer.seekTo(position);
   }
 

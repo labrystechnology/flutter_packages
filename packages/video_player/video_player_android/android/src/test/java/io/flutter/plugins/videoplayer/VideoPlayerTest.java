@@ -37,6 +37,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
@@ -187,6 +188,84 @@ public final class VideoPlayerTest {
     verify(mockExoPlayer).seekTo(10);
 
     videoPlayer.dispose();
+  }
+
+  @Test
+  public void seekToStartFromEndedResetsBeforePreparingWithoutDuplicateSeek() {
+    VideoPlayer videoPlayer = createVideoPlayer();
+    when(mockExoPlayer.getPlaybackState()).thenReturn(Player.STATE_ENDED);
+    clearInvocations(mockExoPlayer);
+
+    videoPlayer.seekTo(0L);
+
+    InOrder order = inOrder(mockExoPlayer);
+    order.verify(mockExoPlayer).getPlaybackState();
+    order.verify(mockExoPlayer).stop();
+    order.verify(mockExoPlayer).seekToDefaultPosition();
+    order.verify(mockExoPlayer).prepare();
+    order.verifyNoMoreInteractions();
+    videoPlayer.dispose();
+  }
+
+  @Test
+  public void seekFromEndedPreservesNonzeroTargetIncludingLastFrame() {
+    VideoPlayer videoPlayer = createVideoPlayer();
+    when(mockExoPlayer.getPlaybackState()).thenReturn(Player.STATE_ENDED);
+
+    // Covers both scrubbing after completion and Dart's final-frame seek.
+    for (long target : new long[] {2000L, 5800L}) {
+      clearInvocations(mockExoPlayer);
+      videoPlayer.seekTo(target);
+
+      InOrder order = inOrder(mockExoPlayer);
+      order.verify(mockExoPlayer).getPlaybackState();
+      order.verify(mockExoPlayer).stop();
+      order.verify(mockExoPlayer).prepare();
+      order.verify(mockExoPlayer).seekTo(target);
+      order.verifyNoMoreInteractions();
+    }
+    videoPlayer.dispose();
+  }
+
+  @Test
+  public void seekOutsideEndedStateDoesNotResetOrChangePlaybackIntent() {
+    VideoPlayer videoPlayer = createVideoPlayer();
+    for (int state : new int[] {Player.STATE_IDLE, Player.STATE_BUFFERING, Player.STATE_READY}) {
+      when(mockExoPlayer.getPlaybackState()).thenReturn(state);
+      for (long target : new long[] {0L, 2000L}) {
+        clearInvocations(mockExoPlayer);
+        videoPlayer.seekTo(target);
+
+        InOrder order = inOrder(mockExoPlayer);
+        order.verify(mockExoPlayer).getPlaybackState();
+        order.verify(mockExoPlayer).seekTo(target);
+        order.verifyNoMoreInteractions();
+      }
+    }
+    videoPlayer.dispose();
+  }
+
+  @Test
+  public void repeatedReplayResetsEachCompletionButNotPendingBufferingSeeks() {
+    VideoPlayer videoPlayer = createVideoPlayer();
+    clearInvocations(mockExoPlayer);
+    for (int replay = 0; replay < 3; replay++) {
+      when(mockExoPlayer.getPlaybackState()).thenReturn(Player.STATE_ENDED);
+      videoPlayer.seekTo(0L);
+      when(mockExoPlayer.getPlaybackState()).thenReturn(Player.STATE_BUFFERING);
+      videoPlayer.seekTo(0L);
+      videoPlayer.play();
+    }
+
+    verify(mockExoPlayer, times(3)).stop();
+    verify(mockExoPlayer, times(3)).seekToDefaultPosition();
+    verify(mockExoPlayer, times(3)).prepare();
+    verify(mockExoPlayer, times(3)).seekTo(0L);
+    verify(mockExoPlayer, times(3)).play();
+    verify(mockExoPlayer, never()).setMediaItem(any());
+    verify(mockExoPlayer, never()).release();
+    videoPlayer.dispose();
+    verify(mockExoPlayer).release();
   }
 
   @Test

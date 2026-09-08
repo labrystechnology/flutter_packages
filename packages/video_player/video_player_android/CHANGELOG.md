@@ -1,3 +1,7 @@
+## 2.12.3
+
+* Fixes prolonged replay buffering on some Android devices by resetting ExoPlayer before seeking from the ended state.
+
 ## 2.12.2
 
 * Fixes a [bug](https://github.com/flutter/flutter/issues/132934) where videos with a pixel aspect ratio other than 1.0 (anamorphic content) reported their coded size instead of their display size, causing them to be rendered stretched.
